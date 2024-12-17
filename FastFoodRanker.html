@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pairwise Ranking Fast Food Restaurants</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        #restaurants {
+            list-style: none;
+            padding: 0;
+        }
+        #restaurants li {
+            margin: 5px 0;
+        }
+        .pair {
+            margin: 10px 0;
+            padding: 5px;
+            border: 1px solid #ccc;
+            display: flex;
+            justify-content: space-around;
+        }
+        .pair button {
+            padding: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .pair button:hover {
+            background-color: #f0f0f0;
+        }
+        .selection-section {
+            margin-bottom: 20px;
+        }
+        #omittedRestaurants {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fast Food Restaurant Pairwise Ranking</h1>
+    <p id="introMessage">Select restaurants you've never been to and they will be omitted from the rankings.</p>
+
+    <!-- Step 1: Restaurant Selection -->
+    <div class="selection-section">
+        <h3>Select Restaurants You've Never Been To</h3>
+        <form id="restaurantSelectionForm">
+            <!-- Checkboxes will be added dynamically -->
+        </form>
+        <button id="startRanking" disabled>Start Ranking</button>
+    </div>
+
+    <!-- Step 2: Pairwise Comparison -->
+    <div id="pairwiseContainer" style="display: none;"></div>
+    <h3>Final Rankings:</h3>
+    <ul id="restaurants"></ul>
+
+    <!-- Step 3: Omitted Restaurants -->
+    <div id="omittedRestaurants" style="display: none;">
+        <h3>Omitted Restaurants (Never Tried):</h3>
+        <ul id="omittedList"></ul>
+    </div>
+
+    <script>
+        const restaurants = [
+            "McDonald's", "Burger King", "Taco Bell", "Wendy's", "Chick-fil-A", "Popeyes", "In-N-Out", "Shake Shack"
+        ];
+
+        let remainingRestaurants = [...restaurants]; // Restaurants available for ranking
+        let rankedRestaurants = []; // Stores the final ranking
+        let comparisons = []; // Keeps track of already compared pairs
+        let untriedRestaurants = new Set(); // Restaurants marked as untried
+        let neverPicked = new Set(); // Tracks restaurants that were never picked in any pairwise matchups
+
+        // Dynamically generate the restaurant selection form with checkboxes
+        function generateSelectionForm() {
+            const form = document.getElementById('restaurantSelectionForm');
+            restaurants.forEach((restaurant, index) => {
+                const label = document.createElement('label');
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = restaurant;
+                checkbox.id = `restaurant-${index}`;
+                checkbox.onchange = toggleStartButton;
+
+                label.appendChild(checkbox);
+                label.appendChild(document.createTextNode(restaurant));
+                label.style.display = 'block';
+                form.appendChild(label);
+            });
+        }
+
+        // Enable or disable the "Start Ranking" button based on selections
+        function toggleStartButton() {
+            const startButton = document.getElementById('startRanking');
+            const checkboxes = document.querySelectorAll('#restaurantSelectionForm input[type="checkbox"]');
+            startButton.disabled = !Array.from(checkboxes).some(checkbox => checkbox.checked);
+        }
+
+        // Start the ranking process after selecting untried restaurants
+        function startRanking() {
+            // Clear previous selections and initialize ranking process
+            untriedRestaurants.clear();
+            neverPicked.clear(); // Reset the "never picked" set
+
+            const checkboxes = document.querySelectorAll('#restaurantSelectionForm input[type="checkbox"]');
+            checkboxes.forEach(checkbox => {
+                if (checkbox.checked) {
+                    untriedRestaurants.add(checkbox.value); // Mark as untried
+                }
+            });
+
+            // Filter out untried restaurants from the remaining list
+            remainingRestaurants = restaurants.filter(restaurant => !untriedRestaurants.has(restaurant));
+
+            // Hide the selection form and intro message, show the ranking interface
+            document.querySelector('.selection-section').style.display = 'none';
+            document.getElementById('introMessage').style.display = 'none';
+            document.getElementById('pairwiseContainer').style.display = 'block';
+
+            // Start the first pairwise comparison
+            const firstPair = getRandomPair();
+            displayPair(firstPair);
+        }
+
+        // Function to get a random pair of restaurants for comparison
+        function getRandomPair() {
+            if (remainingRestaurants.length < 2) {
+                return null;
+            }
+
+            let idx1, idx2;
+            do {
+                idx1 = Math.floor(Math.random() * remainingRestaurants.length);
+                idx2 = Math.floor(Math.random() * remainingRestaurants.length);
+            } while (idx1 === idx2 || comparisons.includes([remainingRestaurants[idx1], remainingRestaurants[idx2]].sort().join(',')));
+
+            // Add this pair to the comparisons list
+            comparisons.push([remainingRestaurants[idx1], remainingRestaurants[idx2]].sort().join(','));
+
+            return [remainingRestaurants[idx1], remainingRestaurants[idx2]];
+        }
+
+        // Function to update the UI with the current pair to compare
+        function displayPair(pair) {
+            const container = document.getElementById("pairwiseContainer");
+            container.innerHTML = ""; // Clear the container
+
+            if (!pair) {
+                container.innerHTML = "<p>Ranking complete!</p>";
+                displayRanking();
+                return;
+            }
+
+            const pairElement = document.createElement("div");
+            pairElement.classList.add("pair");
+
+            const button1 = document.createElement("button");
+            button1.innerText = pair[0];
+            button1.onclick = () => rankPair(pair[0]);
+
+            const button2 = document.createElement("button");
+            button2.innerText = pair[1];
+            button2.onclick = () => rankPair(pair[1]);
+
+            pairElement.appendChild(button1);
+            pairElement.appendChild(button2);
+            container.appendChild(pairElement);
+        }
+
+        // Function to handle ranking after comparison
+        function rankPair(winner) {
+            // Add the winner to the ranked list
+            rankedRestaurants.push(winner);
+            remainingRestaurants = remainingRestaurants.filter(r => r !== winner);
+            neverPicked.add(winner); // Mark as picked
+
+            // Recurse and show the next comparison
+            const nextPair = getRandomPair();
+            displayPair(nextPair);
+        }
+
+        // Function to display the current ranking
+        function displayRanking() {
+            const rankingList = document.getElementById("restaurants");
+            rankingList.innerHTML = "";
+
+            // Add the picked restaurants to the ranking list
+            rankedRestaurants.forEach((restaurant, index) => {
+                const listItem = document.createElement("li");
+                listItem.innerText = `${index + 1}. ${restaurant}`;
+                rankingList.appendChild(listItem);
+            });
+
+            // Add the last restaurant (never picked) in last place if there is one
+            const remaining = remainingRestaurants.filter(r => !neverPicked.has(r));
+            if (remaining.length > 0) {
+                const lastRestaurant = remaining[0];
+                const lastListItem = document.createElement("li");
+                lastListItem.innerText = `${rankedRestaurants.length + 1}. ${lastRestaurant}`;
+                rankingList.appendChild(lastListItem);
+                rankedRestaurants.push(lastRestaurant); // Ensure it appears last in the final rankings
+            }
+
+            // Display omitted restaurants
+            displayOmittedRestaurants();
+        }
+
+        // Function to display the list of omitted restaurants (those never tried)
+        function displayOmittedRestaurants() {
+            const omittedList = document.getElementById("omittedList");
+            omittedList.innerHTML = "";
+
+            untriedRestaurants.forEach(restaurant => {
+                const listItem = document.createElement("li");
+                listItem.innerText = restaurant;
+                omittedList.appendChild(listItem);
+            });
+
+            // Show the omitted restaurants section
+            document.getElementById("omittedRestaurants").style.display = 'block';
+        }
+
+        // Initialize the restaurant selection UI
+        generateSelectionForm();
+
+        // Add event listener to the start button
+        document.getElementById('startRanking').addEventListener('click', startRanking);
+    </script>
+</body>
+</html>
