@@ -72,6 +72,7 @@
         let comparisons = []; // Keeps track of already compared pairs
         let untriedRestaurants = new Set(); // Restaurants marked as untried
         let neverPicked = new Set(); // Tracks restaurants that were never picked in any pairwise matchups
+        let matchupQueue = []; // Stores all pairwise matchups to ensure we cover all comparisons
 
         // Dynamically generate the restaurant selection form with checkboxes
         function generateSelectionForm() {
@@ -103,6 +104,7 @@
             // Clear previous selections and initialize ranking process
             untriedRestaurants.clear();
             neverPicked.clear(); // Reset the "never picked" set
+            matchupQueue = []; // Reset the matchup queue
 
             const checkboxes = document.querySelectorAll('#restaurantSelectionForm input[type="checkbox"]');
             checkboxes.forEach(checkbox => {
@@ -119,27 +121,21 @@
             document.getElementById('introMessage').style.display = 'none';
             document.getElementById('pairwiseContainer').style.display = 'block';
 
+            // Generate all pairwise matchups
+            generateMatchups();
+
             // Start the first pairwise comparison
-            const firstPair = getRandomPair();
+            const firstPair = matchupQueue.shift();
             displayPair(firstPair);
         }
 
-        // Function to get a random pair of restaurants for comparison
-        function getRandomPair() {
-            if (remainingRestaurants.length < 2) {
-                return null;
+        // Generate all pairwise matchups
+        function generateMatchups() {
+            for (let i = 0; i < remainingRestaurants.length; i++) {
+                for (let j = i + 1; j < remainingRestaurants.length; j++) {
+                    matchupQueue.push([remainingRestaurants[i], remainingRestaurants[j]]);
+                }
             }
-
-            let idx1, idx2;
-            do {
-                idx1 = Math.floor(Math.random() * remainingRestaurants.length);
-                idx2 = Math.floor(Math.random() * remainingRestaurants.length);
-            } while (idx1 === idx2 || comparisons.includes([remainingRestaurants[idx1], remainingRestaurants[idx2]].sort().join(',')));
-
-            // Add this pair to the comparisons list
-            comparisons.push([remainingRestaurants[idx1], remainingRestaurants[idx2]].sort().join(','));
-
-            return [remainingRestaurants[idx1], remainingRestaurants[idx2]];
         }
 
         // Function to update the UI with the current pair to compare
@@ -176,9 +172,17 @@
             remainingRestaurants = remainingRestaurants.filter(r => r !== winner);
             neverPicked.add(winner); // Mark as picked
 
-            // Recurse and show the next comparison
-            const nextPair = getRandomPair();
-            displayPair(nextPair);
+            // If there are remaining matchups, show the next one
+            if (matchupQueue.length > 0) {
+                const nextPair = matchupQueue.shift();
+                displayPair(nextPair);
+            } else {
+                // All comparisons are done, fill in the last place restaurant
+                if (remainingRestaurants.length === 1) {
+                    rankedRestaurants.push(remainingRestaurants[0]);
+                }
+                displayRanking();
+            }
         }
 
         // Function to display the current ranking
@@ -192,16 +196,6 @@
                 listItem.innerText = `${index + 1}. ${restaurant}`;
                 rankingList.appendChild(listItem);
             });
-
-            // Add the last restaurant (never picked) in last place if there is one
-            const remaining = remainingRestaurants.filter(r => !neverPicked.has(r));
-            if (remaining.length > 0) {
-                const lastRestaurant = remaining[0];
-                const lastListItem = document.createElement("li");
-                lastListItem.innerText = `${rankedRestaurants.length + 1}. ${lastRestaurant}`;
-                rankingList.appendChild(lastListItem);
-                rankedRestaurants.push(lastRestaurant); // Ensure it appears last in the final rankings
-            }
 
             // Display omitted restaurants
             displayOmittedRestaurants();
@@ -230,3 +224,4 @@
     </script>
 </body>
 </html>
+
